@@ -94,7 +94,27 @@ $('prev').onclick=()=>{selected=Math.max(0,selected-1);drawBoard();};
 $('next').onclick=()=>{selected=Math.min(parsed?.moves.length||0,selected+1);drawBoard();};
 $('last').onclick=()=>{selected=parsed?.moves.length||0;drawBoard();};
 $('flip').onclick=()=>{flipped=!flipped;drawBoard();};
-document.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA'].includes(document.activeElement.tagName))return;if(e.key==='ArrowLeft')$('prev').click();if(e.key==='ArrowRight')$('next').click();});
+document.addEventListener('keydown',e=>{
+ if(e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||['INPUT','TEXTAREA'].includes(document.activeElement.tagName)||document.activeElement.isContentEditable)return;
+ const n=parsed?.moves.length||0;
+ const step={ArrowLeft:-1,ArrowRight:1,ArrowUp:-2,ArrowDown:2};
+ if(Object.prototype.hasOwnProperty.call(step,e.key)){e.preventDefault();selected=Math.max(0,Math.min(n,selected+step[e.key]));drawBoard();}
+ else if(e.key==='Home'){e.preventDefault();selected=0;drawBoard();}
+ else if(e.key==='End'){e.preventDefault();selected=n;drawBoard();}
+});
+const coachHistory=[];
+function coachMessage(role,content){const el=document.createElement('div');el.className='coach-message '+role;el.textContent=content;$('coachMessages').append(el);$('coachMessages').scrollTop=$('coachMessages').scrollHeight;return el;}
+$('coachForm').addEventListener('submit',async e=>{
+ e.preventDefault();const question=$('coachQuestion').value.trim();if(!question)return;
+ if(!analysis){message('Analyze a completed game first, then ask the coach about a move.');return;}
+ const move=analysis.moves[selected-1]||{};
+ const game={white:analysis.white,black:analysis.black,result:analysis.result,depth:analysis.depth,engine:analysis.engine};
+ const history=coachHistory.slice(-8);coachMessage('user',question);$('coachQuestion').value='';
+ const pending=coachMessage('assistant','Thinking locally…');$('coachSend').disabled=true;
+ try{const reply=await request('/coach',{method:'POST',body:JSON.stringify({question,move,game,history})});pending.textContent=reply.answer;coachHistory.push({role:'user',content:question},{role:'assistant',content:reply.answer});}
+ catch(err){pending.textContent='Coach error: '+err.message;}
+ finally{$('coachSend').disabled=false;}
+});
 const params=new URLSearchParams(location.search);
 if(params.has('pgn')){$('pgn').value=params.get('pgn').slice(0,120000);try{importGame();}catch(e){message(e.message);}}
 drawBoard();
