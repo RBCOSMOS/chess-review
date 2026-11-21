@@ -3,7 +3,7 @@
 const $=id=>document.getElementById(id);
 const START='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
 let parsed=null,analysis=null,selected=0,flipped=localStorage.getItem("chess-board-black-bottom")==="true",busy=false;
-let mode='review', picked=null, variation=null, playState=null, playHistory=[], playSide='w', thinking=false, marks=[], arrowStart=null;
+let mode='review', picked=null, variation=null, playState=null, playHistory=[], playSide='w', thinking=false, marks=[], arrowStart=null, playedMoves=[], gameSession=0;
 const fullFen=st=>{
  const turn=st.t===1?'w':'b',castle=st.c||'-',ep=st.ep<0?'-':PGNImport.square(st.ep);
  return `${PGNImport.placement(st)} ${turn} ${castle} ${ep} ${st.half} ${st.full}`;
@@ -36,7 +36,7 @@ function makeMove(from,to,promotion='q'){
  const next=PGNImport.apply(st,move);
  if(mode==='play'){
   if((st.t===1?'w':'b')!==playSide)return;
-  playState=next;playHistory.push(next);$('playInfo').textContent='You played '+PGNImport.san(st,move);drawBoard();
+  playState=next;playHistory.push(next);playedMoves.push(PGNImport.san(st,move));$('playInfo').textContent='You played '+playedMoves[playedMoves.length-1];drawBoard();
   if(PGNImport.legal(next).length)stockfishTurn();
   else $('playInfo').textContent='Game over — no legal moves.';
  }else{variation=next;drawBoard();$('boardHelp').textContent='Exploring a variation. Use the move navigation buttons to return to the original game.';}
@@ -44,20 +44,22 @@ function makeMove(from,to,promotion='q'){
 }
 async function stockfishTurn(){
  if(!playState||thinking)return;
+ const session=gameSession;
  thinking=true;$('playInfo').textContent='Stockfish thinking…';
  try{
   const data=await request('/play',{method:'POST',body:JSON.stringify({fen:fullFen(playState),elo:+$('elo').value,depth:12})});
+  if(session!==gameSession)return;
   if(data.move){
    const move=PGNImport.legal(playState).find(m=>PGNImport.square(m[0])+PGNImport.square(m[1])+(m[2]||'')===data.move);
    if(!move)throw Error('Server returned an illegal move.');
-   playState=PGNImport.apply(playState,move);playHistory.push(playState);
+   playedMoves.push(PGNImport.san(playState,move));playState=PGNImport.apply(playState,move);playHistory.push(playState);
   }
   $('playInfo').textContent=data.gameOver?'Game over: '+data.result:'Stockfish played '+(data.san||'');
- }catch(e){$('playInfo').textContent='Engine error: '+e.message;}
- finally{thinking=false;drawBoard();}
+ }catch(e){if(session===gameSession)$('playInfo').textContent='Engine error: '+e.message;}
+ finally{if(session===gameSession){thinking=false;drawBoard();}}
 }
 const icons={Brilliant:'brilliant',Great:'great',Best:'best',Excellent:'excellent',Good:'good',Inaccuracy:'inaccuracy',Mistake:'mistake',Blunder:'blunder',Book:'book',Miss:'mistake'};
-const cleanUrl=u=>{const x=new URL(u.trim());if(x.protocol!=='https:'||x.username||x.password||x.search||x.hash)throw Error('Use an HTTPS ngrok URL without a path, query or credentials.');return x.origin;};
+const cleanUrl=u=>{const raw=String(u||'').trim();if(!raw)throw Error('Enter your ngrok HTTPS URL under Engine connection first.');let x;try{x=new URL(raw);}catch{throw Error('Invalid ngrok URL. Paste the full https://...ngrok-free.dev address from your ngrok terminal.');}if(x.protocol!=='https:'||x.username||x.password||x.search||x.hash||x.pathname!=='/')throw Error('Use the full HTTPS ngrok URL only, without an extra path, query, or credentials.');return x.origin;};
 function message(t){$('error').textContent=t||'';}
 function setStatus(text,ok){$('status').textContent='● '+text;$('status').classList.toggle('ok',!!ok);}
 function placementAt(i){return i===0?(parsed?.initialPlacement||START):parsed?.moves[i-1]?.position||START;}
@@ -184,13 +186,35 @@ $('coachForm').addEventListener('submit',async e=>{
 
 $('elo').addEventListener('input',()=>{$('eloValue').textContent=$('elo').value;});
 $('newGame').onclick=()=>{
- mode='play';playSide=$('playColor').value;flipped=playSide==='b';
+ gameSession++;thinking=false;playedMoves=[];mode='play';playSide=$('playColor').value;flipped=playSide==='b';
  playState=PGNImport.parse(START+' w KQkq - 0 1');playHistory=[playState];variation=null;resetAnnotations();
  $('boardHelp').textContent='Play against Stockfish: click a piece and a highlighted destination. Right-drag for arrows.';
  $('playInfo').textContent='New game started. You play '+(playSide==='w'?'White':'Black')+'.';drawBoard();
  if(playSide==='b')stockfishTurn();
 };
-$('returnReview').onclick=()=>{mode='review';variation=null;resetAnnotations();$('boardHelp').textContent='Review: click pieces to explore legal moves. Right-drag for arrows.';drawBoard();};
+function playedPGN(){
+ if(!playedMoves.length)throw Error('Play at least one move before reviewing your game.');
+ const date=new Date().toISOString().slice(0,10).replace(/-/g,'.');
+ const safe=n=>String(n).replace(/[\\"\r\n]/g,' ');
+ const white=playSide==='w'?'You':'Stockfish '+$('elo').value;
+ const black=playSide==='b'?'You':'Stockfish '+$('elo').value;
+ const header=`[Event "Practice vs Stockfish"]\n[Site "Chess Study Assistant"]\n[Date "${date}"]\n[White "${safe(white)}"]\n[Black "${safe(black)}"]\n[Result "*"]\n\n`;
+ const body=[];for(let i=0;i<playedMoves.length;i++){if(i%2===0)body.push(`${Math.floor(i/2)+1}.`);body.push(playedMoves[i]);}
+ return header+body.join(' ')+' *';
+}
+$('reviewMyGame').onclick=async()=>{
+ if(thinking){$('playInfo').textContent='Wait for Stockfish to finish its move before reviewing.';return;}
+ try{
+  const pgn=playedPGN();
+  $('pgn').value=pgn;
+  gameSession++;mode='review';variation=null;resetAnnotations();
+  $('boardHelp').textContent='Review your played game, or explore variations by clicking pieces.';
+  $('playInfo').textContent='Game copied into Game Review. Analyzing your moves…';
+  $('analyze').click();
+ }catch(e){$('playInfo').textContent=e.message;}
+};
+$('copyMyPGN').onclick=async()=>{try{await navigator.clipboard.writeText(playedPGN());$('playInfo').textContent='PGN copied to clipboard.';}catch(e){$('playInfo').textContent=e.message;}};
+$('returnReview').onclick=()=>{gameSession++;thinking=false;mode='review';variation=null;resetAnnotations();$('boardHelp').textContent='Review: click pieces to explore legal moves. Right-drag for arrows.';drawBoard();};
 $('clearArrows').onclick=resetAnnotations;
 $('board').addEventListener('contextmenu',e=>e.preventDefault());
 $('board').addEventListener('pointerdown',e=>{if(e.button!==2)return;arrowStart=boardSquare(e.target);e.preventDefault();});
