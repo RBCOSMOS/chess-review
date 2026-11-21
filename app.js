@@ -2,7 +2,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const START='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
-let parsed=null,analysis=null,selected=0,flipped=false,busy=false;
+let parsed=null,analysis=null,selected=0,flipped=localStorage.getItem("chess-board-black-bottom")==="true",busy=false;
 const icons={Brilliant:'brilliant',Great:'great',Best:'best',Excellent:'excellent',Good:'good',Inaccuracy:'inaccuracy',Mistake:'mistake',Blunder:'blunder',Book:'book',Miss:'mistake'};
 const cleanUrl=u=>{const x=new URL(u.trim());if(x.protocol!=='https:'||x.username||x.password||x.search||x.hash)throw Error('Use an HTTPS ngrok URL without a path, query or credentials.');return x.origin;};
 function message(t){$('error').textContent=t||'';}
@@ -22,6 +22,10 @@ function drawBoard(){
   board.append(cell);
  }
  const m=parsed?.moves[selected-1],r=analysis?.moves[selected-1];
+ $('blackName').textContent=flipped?(parsed?.headers.White||'WHITE'):(parsed?.headers.Black||'BLACK');
+ $('whiteName').textContent=flipped?(parsed?.headers.Black||'BLACK'):(parsed?.headers.White||'WHITE');
+ $('flip').textContent=flipped?'⇅ White at bottom':'⇅ Black at bottom';
+ $('flip').setAttribute('aria-label',flipped?'Put White at bottom':'Put Black at bottom');
  $('moveNum').textContent=m?`${Math.ceil(selected/2)}${selected%2?'.':'...'} ${m.san}`:'Starting position';
  $('rating').textContent=r?`${r.label} · ${m.san}`:'Select a move';
  $('explain').textContent=r?.explanation||'Move explanations will appear here after analysis.';
@@ -93,7 +97,7 @@ $('first').onclick=()=>{selected=0;drawBoard();};
 $('prev').onclick=()=>{selected=Math.max(0,selected-1);drawBoard();};
 $('next').onclick=()=>{selected=Math.min(parsed?.moves.length||0,selected+1);drawBoard();};
 $('last').onclick=()=>{selected=parsed?.moves.length||0;drawBoard();};
-$('flip').onclick=()=>{flipped=!flipped;drawBoard();};
+$('flip').onclick=()=>{flipped=!flipped;localStorage.setItem('chess-board-black-bottom',String(flipped));drawBoard();};
 document.addEventListener('keydown',e=>{
  if(e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||['INPUT','TEXTAREA'].includes(document.activeElement.tagName)||document.activeElement.isContentEditable)return;
  const n=parsed?.moves.length||0;
