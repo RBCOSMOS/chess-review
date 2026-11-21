@@ -12,3 +12,16 @@
 .square img{width:90%;height:90%;filter:none}
 
 .coach-chat{border-top:1px solid #354357;margin-top:20px;padding-top:16px}.coach-chat h2{display:flex;align-items:center;justify-content:space-between}.coach-chat small{font-size:10px;color:#76d6bb}.coach-messages{max-height:330px;min-height:115px;overflow:auto;display:flex;flex-direction:column;gap:9px;margin:12px 0}.coach-message{padding:11px;border-radius:10px;white-space:pre-wrap;line-height:1.5;font-size:12px;background:#263449}.coach-message.user{background:#27574b;align-self:flex-end}.coach-message.assistant{align-self:flex-start}.coach-chat textarea{height:66px}.coach-chat button{width:100%;margin-top:8px;background:#40b78e;color:#071d16}.coach-chat button:disabled{opacity:.5;cursor:wait}
+
+/* v7.6: original Game Review badge images, legible at a glance */
+.move .rating img{width:29px;height:29px;object-fit:contain;flex-shrink:0}
+.move .rating em{font-size:12px}
+.move{min-height:58px;align-items:center}
+.move .rating{flex-shrink:0}
+.selected-badge{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 0 12px;padding:9px 12px;border:1px solid #3a5061;border-radius:10px;background:#243244;color:#f3f8fa;font-size:16px;font-weight:800}
+.selected-badge[hidden]{display:none}
+.selected-badge img{width:39px;height:39px;object-fit:contain}
+.badge-legend{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 14px}
+.legend-item{display:flex;align-items:center;gap:5px;background:#222d3e;padding:5px 8px;border-radius:7px;font-size:11px;color:#cbd6e4}
+.legend-item img{width:22px;height:22px;object-fit:contain}
+@media(max-width:740px){.move .rating em{font-size:10px}.move .rating img{width:25px;height:25px}.legend-item{font-size:10px}}

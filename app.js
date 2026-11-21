@@ -28,6 +28,8 @@ function drawBoard(){
  $('flip').setAttribute('aria-label',flipped?'Put White at bottom':'Put Black at bottom');
  $('moveNum').textContent=m?`${Math.ceil(selected/2)}${selected%2?'.':'...'} ${m.san}`:'Starting position';
  $('rating').textContent=r?`${r.label} · ${m.san}`:'Select a move';
+ const badge=$('selectedBadge');badge.hidden=!r;
+ if(r){$('selectedBadgeIcon').src='rating-icons/'+(icons[r.label]||'good')+'.png';$('selectedBadgeIcon').alt=r.label+' badge';$('selectedBadgeText').textContent=r.label+' · '+m.san;}
  $('explain').textContent=r?.explanation||'Move explanations will appear here after analysis.';
  $('evaluation').textContent=r?`Evaluation: ${(r.cpAfter/100).toFixed(2)} · Expected loss: ${r.expectedLoss}`:'Eval: —';
  document.querySelectorAll('.move').forEach(el=>el.classList.toggle('selected',+el.dataset.ply===selected));
@@ -40,8 +42,9 @@ function renderMoves(){
   const b=document.createElement('button');b.className='move';b.dataset.ply=i+1;
   const name=document.createElement('span');name.textContent=`${Math.ceil((i+1)/2)}${i%2?'...':'.'} ${m.san}`;
   const rating=document.createElement('span');rating.className='rating';
-  const img=document.createElement('img');img.src='rating-icons/'+(icons[m.label]||'good')+'.png';img.alt='';
+  const img=document.createElement('img');img.src='rating-icons/'+(icons[m.label]||'good')+'.png';img.alt=m.label+' badge';
   const t=document.createElement('em');t.textContent=m.label;rating.append(img,t);b.append(name,rating);
+  b.title=m.label+' — '+m.san;b.setAttribute('aria-label',name.textContent+', '+m.label);
   b.addEventListener('click',()=>{selected=i+1;drawBoard();});box.append(b);
  }
  $('moveCount').textContent=analysis.moves.length+' half-moves';
@@ -92,6 +95,12 @@ $('analyze').addEventListener('click',async()=>{
   setStatus('Connected',true);
  }catch(e){$('progress').textContent='ERROR';message(e.message);}finally{busy=false;$('analyze').disabled=false;}
 });
+const badgeLegend=$('badgeLegend');
+for(const label of ['Brilliant','Great','Best','Excellent','Good','Book','Inaccuracy','Mistake','Blunder']){
+ const item=document.createElement('span');item.className='legend-item';
+ const img=document.createElement('img');img.src='rating-icons/'+icons[label]+'.png';img.alt='';
+ item.append(img,document.createTextNode(label));badgeLegend.append(item);
+}
 $('depth').addEventListener('input',()=>{$('depthValue').textContent=$('depth').value;});
 $('first').onclick=()=>{selected=0;drawBoard();};
 $('prev').onclick=()=>{selected=Math.max(0,selected-1);drawBoard();};
