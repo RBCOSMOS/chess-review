@@ -5,7 +5,7 @@ const START='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
 let parsed=null,analysis=null,selected=0,flipped=localStorage.getItem("chess-board-black-bottom")==="true",busy=false;
 let mode='review', picked=null, variation=null, playState=null, playHistory=[], playSide='w', thinking=false, marks=[], arrowStart=null, playedMoves=[], gameSession=0;
 const fullFen=st=>{
- const turn=st.t===1?'w':'b',castle=st.c||'-',ep=st.ep<0?'-':PGNImport.square(st.ep);
+ const turn=st.t===1?'w':'b',castle=st.c&&st.c.length?st.c:'-',ep=st.ep<0?'-':PGNImport.square(st.ep);
  return `${PGNImport.placement(st)} ${turn} ${castle} ${ep} ${st.half} ${st.full}`;
 };
 function reviewState(){
@@ -55,7 +55,7 @@ async function stockfishTurn(){
    playedMoves.push(PGNImport.san(playState,move));playState=PGNImport.apply(playState,move);playHistory.push(playState);
   }
   $('playInfo').textContent=data.gameOver?'Game over: '+data.result:'Stockfish played '+(data.san||'');
- }catch(e){if(session===gameSession)$('playInfo').textContent='Engine error: '+e.message;}
+ }catch(e){if(session===gameSession)$('playInfo').textContent='Engine error: '+e.message+' Your move is saved. Click Retry engine move.';}
  finally{if(session===gameSession){thinking=false;drawBoard();}}
 }
 const icons={Brilliant:'brilliant',Great:'great',Best:'best',Excellent:'excellent',Good:'good',Inaccuracy:'inaccuracy',Mistake:'mistake',Blunder:'blunder',Book:'book',Miss:'mistake'};
@@ -121,12 +121,16 @@ function importGame(){
 async function request(path,options={}){
  const url=cleanUrl($('url').value),token=$('token').value.trim();
  if(!token)throw Error('Enter the access token from your local server.');
- const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),20*60*1000);
+ const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),path==='/play'?12000:20*60*1000);
  try{
   const res=await fetch(url+path,{...options,signal:ctrl.signal,headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json','ngrok-skip-browser-warning':'true'}});
   const body=await res.json().catch(()=>({detail:'Server did not return JSON'}));
   if(!res.ok)throw Error(typeof body.detail==='string'?body.detail:`Server returned ${res.status}`);
   return body;
+ }catch(e){
+  if(e.name==='AbortError')throw Error(path==='/play'?'Stockfish timed out (12 seconds). Check that the server is running, then press Retry engine move.':'Request timed out.');
+  if(e instanceof TypeError)throw Error('Cannot reach the server. Test connection, check that ngrok is online, and restart the local server if necessary.');
+  throw e;
  }finally{clearTimeout(timer);}
 }
 $('pasteSetup').addEventListener('click',async()=>{
@@ -185,6 +189,7 @@ $('coachForm').addEventListener('submit',async e=>{
 });
 
 $('elo').addEventListener('input',()=>{$('eloValue').textContent=$('elo').value;});
+$('retryEngine').onclick=()=>{if(mode==='play'&&!thinking&&playState&&(playState.t===1?'w':'b')!==playSide)stockfishTurn();else $('playInfo').textContent='No pending engine move to retry.';};
 $('newGame').onclick=()=>{
  gameSession++;thinking=false;playedMoves=[];mode='play';playSide=$('playColor').value;flipped=playSide==='b';
  playState=PGNImport.parse(START+' w KQkq - 0 1');playHistory=[playState];variation=null;resetAnnotations();
